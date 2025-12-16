@@ -13,47 +13,36 @@
         .stats { font-weight: bold; color: #666; }
         
         .question-box { margin-bottom: 20px; }
-        .question-text { font-size: 1.2em; margin-bottom: 15px; font-weight: bold; }
+        .question-text { font-size: 1.2em; margin-bottom: 5px; font-weight: bold; }
         
+        /* NOVÉ: Štýl pre nápovedu (Vyberte 2...) */
+        .question-hint { color: #e67e22; font-weight: bold; margin-bottom: 15px; font-style: italic; }
+
         .images-container { text-align: center; margin-bottom: 15px; }
         .images-container img { 
-            max-width: 50%; 
-            height: auto; 
-            border: 1px solid #ddd; 
-            margin: 10px auto; 
-            border-radius: 4px; 
-            display: block; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            cursor: pointer; 
+            max-width: 50%; height: auto; border: 1px solid #ddd; margin: 10px auto; 
+            border-radius: 4px; display: block; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; 
         }
         @media (max-width: 600px) { .images-container img { max-width: 90%; } }
 
         .options-list { list-style: none; padding: 0; }
         .option-item { 
             background: #f9f9f9; border: 1px solid #ddd; padding: 12px; margin-bottom: 8px; 
-            cursor: pointer; border-radius: 4px; transition: background 0.2s, border-color 0.2s; 
-            position: relative;
+            cursor: pointer; border-radius: 4px; transition: background 0.2s; position: relative;
         }
         .option-item:hover { background: #eef; }
         
-        /* NOVÉ: Štýl pre označenú odpoveď (pred kontrolou) */
-        .option-item.selected { 
-            background-color: #e7f1ff; 
-            border-color: #007bff; 
-            color: #0056b3;
-            font-weight: bold;
-        }
-
         /* Štýly po vyhodnotení */
-        .option-item.correct { background-color: #d4edda; border-color: #28a745; color: #155724; }
-        .option-item.wrong { background-color: #f8d7da; border-color: #dc3545; color: #721c24; }
+        .option-item.correct { background-color: #d4edda; border-color: #28a745; color: #155724; font-weight: bold; }
+        .option-item.wrong { background-color: #f8d7da; border-color: #dc3545; color: #721c24; opacity: 0.8; }
         
-        /* Zvýraznenie toho, čo používateľ vybral zle */
-        .option-item.wrong::after { content: " ❌"; float: right; }
-        /* Zvýraznenie toho, čo je správne */
         .option-item.correct::after { content: " ✅"; float: right; }
-
+        .option-item.wrong::after { content: " ❌"; float: right; }
+        
+        /* Keď je koniec otázky, zakážeme klikanie na ostatné */
         .option-item.disabled { pointer-events: none; }
+        /* Neoznačené možnosti po skončení trochu stmavíme */
+        .option-item.finished { opacity: 0.6; pointer-events: none; }
 
         .explanation { 
             display: none; background: #fff3cd; border: 1px solid #ffeeba; 
@@ -72,16 +61,6 @@
         .shuffle-btn { background-color: #fd7e14; font-size: 14px; padding: 8px 15px; }
         .shuffle-btn:hover { background-color: #e36d0d; }
 
-        /* NOVÉ: Tlačidlo Skontrolovať */
-        .check-btn {
-            background-color: #28a745;
-            width: 100%;
-            margin-top: 10px;
-            font-weight: bold;
-            display: none; /* Zobrazí sa len keď sú možnosti */
-        }
-        .check-btn:hover { background-color: #218838; }
-
         .jump-control {
             display: flex; align-items: center; gap: 10px; margin-top: 20px; 
             padding-top: 15px; border-top: 1px solid #eee; justify-content: center; 
@@ -92,7 +71,7 @@
 <body>
 
 <div class="container">
-    <h1>CCNA 2 - Test</h1>
+    <h1>CCNA 2 - Opakovanie</h1>
     
     <div class="header-bar">
         <div class="stats">
@@ -105,10 +84,10 @@
     <div id="quiz-area">
         <div class="question-box">
             <div id="q-text" class="question-text">Načítavam test...</div>
+            <div id="q-hint" class="question-hint"></div>
+            
             <div id="q-images" class="images-container"></div>
             <ul id="q-options" class="options-list"></ul>
-            
-            <button id="check-btn" class="check-btn" onclick="validateAnswer()">Skontrolovať odpoveď</button>
         </div>
         
         <div id="explanation" class="explanation"></div>
@@ -132,7 +111,10 @@
     let allQuestions = [];
     let currentIndex = 0;
     let score = 0;
-    let isAnswered = false; // Stav, či už bola otázka vyhodnotená
+    
+    // Premenné pre logiku "Sudden Death"
+    let correctFoundCount = 0; // Koľko správnych už našiel
+    let questionFinished = false; // Či je otázka uzavretá
 
     // Načítanie dát
     fetch('data.json')
@@ -144,7 +126,7 @@
             loadQuestion(0);
         })
         .catch(error => {
-            document.getElementById('q-text').innerText = "Chyba: Nepodarilo sa načítať data.json. Skontrolujte, či je súbor v rovnakom priečinku.";
+            document.getElementById('q-text').innerText = "Chyba: Nepodarilo sa načítať data.json.";
             console.error(error);
         });
 
@@ -162,27 +144,41 @@
     function loadQuestion(index) {
         if (index < 0 || index >= allQuestions.length) return;
         currentIndex = index;
-        isAnswered = false; // Reset stavu
+        
+        // Reset stavu
+        questionFinished = false;
+        correctFoundCount = 0;
 
         const q = allQuestions[index];
         const textField = document.getElementById('q-text');
+        const hintField = document.getElementById('q-hint');
         const imgContainer = document.getElementById('q-images');
         const optionsList = document.getElementById('q-options');
         const explanationDiv = document.getElementById('explanation');
-        const checkBtn = document.getElementById('check-btn');
         const nextBtn = document.getElementById('next-btn');
         const prevBtn = document.getElementById('prev-btn');
         const select = document.getElementById('jump-select');
 
-        // Reset UI
+        // UI Reset
         explanationDiv.style.display = 'none';
         explanationDiv.innerHTML = '';
         imgContainer.innerHTML = '';
         optionsList.innerHTML = '';
-        checkBtn.style.display = 'none'; // Skryť tlačidlo kontroly
 
-        // Text
+        // Text otázky
         textField.innerText = q.question_text;
+
+        // NOVÉ: Zobrazenie počtu správnych odpovedí
+        const numCorrect = q.correct_options.length;
+        if (q.options.length > 0) {
+            if (numCorrect > 1) {
+                hintField.innerText = `(Vyberte ${numCorrect} správne odpovede)`;
+            } else {
+                hintField.innerText = `(Vyberte 1 správnu odpoveď)`;
+            }
+        } else {
+            hintField.innerText = "";
+        }
 
         // Obrázky
         if (q.images && q.images.length > 0) {
@@ -201,19 +197,16 @@
                 const li = document.createElement('li');
                 li.className = 'option-item';
                 li.innerText = opt;
-                // ZMENA: Kliknutie len prepína výber (toggleSelection)
-                li.onclick = () => toggleSelection(li);
-                li.dataset.index = i; // Uložíme si index do elementu
+                // Posielame element aj index na okamžitú kontrolu
+                li.onclick = () => handleOptionClick(li, i, q.correct_options, q.explanation);
                 optionsList.appendChild(li);
             });
-            checkBtn.style.display = 'block'; // Ukázať tlačidlo "Skontrolovať"
-            checkBtn.innerText = "Skontrolovať odpoveď";
-            checkBtn.disabled = false;
         } else {
-            // Pre otázky bez textových možností
             optionsList.innerHTML = "<li><i>Táto otázka nemá textové možnosti.</i></li><br>";
-            checkBtn.style.display = 'block';
-            checkBtn.innerText = "Ukáž správnu odpoveď (len obrázok)";
+            const showBtn = document.createElement('button');
+            showBtn.innerText = "Ukáž správnu odpoveď";
+            showBtn.onclick = () => finishQuestion(false, q.correct_options, q.explanation);
+            optionsList.appendChild(showBtn);
         }
 
         document.getElementById('progress').innerText = `Otázka: ${currentIndex + 1} / ${allQuestions.length}`;
@@ -222,83 +215,63 @@
         select.value = currentIndex;
     }
 
-    // NOVÉ: Funkcia na prepínanie výberu (modré označenie)
-    function toggleSelection(element) {
-        if (isAnswered) return; // Ak už je vyhodnotené, nedovoľ zmeny
-        element.classList.toggle('selected');
-    }
+    // NOVÉ: Hlavná logika klikania
+    function handleOptionClick(element, index, correctIndices, explanationText) {
+        if (questionFinished || element.classList.contains('disabled')) return;
 
-    // NOVÉ: Funkcia na vyhodnotenie odpovede
-    function validateAnswer() {
-        if (isAnswered) return; // Poistka
-        
-        const q = allQuestions[currentIndex];
-        const options = document.querySelectorAll('.option-item');
-        const checkBtn = document.getElementById('check-btn');
-        
-        // Získame indexy, ktoré používateľ označil
-        let userSelectedIndices = [];
-        options.forEach((opt, index) => {
-            if (opt.classList.contains('selected')) {
-                userSelectedIndices.push(index);
-            }
-        });
+        const isCorrect = correctIndices.includes(index);
 
-        // Kontrola, či používateľ vôbec niečo vybral (ak otázka má možnosti)
-        if (q.options.length > 0 && userSelectedIndices.length === 0) {
-            alert("Prosím, vyber aspoň jednu možnosť.");
-            return;
-        }
+        if (isCorrect) {
+            // 1. SPRÁVNA ODPOVEĎ
+            element.classList.add('correct');
+            element.classList.add('disabled'); // Už na ňu neklikneš
+            correctFoundCount++;
 
-        isAnswered = true; // Zablokujeme ďalšie zmeny
-        checkBtn.disabled = true; // Vypneme tlačidlo
-
-        let isAllCorrect = true;
-
-        // PRECHÁDZANIE MOŽNOSTÍ A FARBENIE
-        options.forEach((opt, index) => {
-            opt.classList.remove('selected'); // Odstránime modré označenie
-            opt.classList.add('disabled'); // Zablokujeme klikanie
-
-            const isReallyCorrect = q.correct_options.includes(index);
-            const userSelectedThis = userSelectedIndices.includes(index);
-
-            if (isReallyCorrect) {
-                // Je to správna odpoveď -> vždy bude zelená
-                opt.classList.add('correct');
-                
-                // Ak bola správna a používateľ ju NEVYBRAL, tak chyba
-                if (!userSelectedThis) {
-                    isAllCorrect = false;
-                }
-            } else {
-                // Je to nesprávna odpoveď
-                if (userSelectedThis) {
-                    // Používateľ ju vybral -> chyba (červená)
-                    opt.classList.add('wrong');
-                    isAllCorrect = false;
-                }
-            }
-        });
-
-        // Úprava skóre (Len ak je všetko 100% správne)
-        if (q.options.length > 0) {
-            if (isAllCorrect) {
+            // Skontrolujeme, či už našiel všetky
+            if (correctFoundCount === correctIndices.length) {
+                // VÍŤAZSTVO!
                 score++;
                 document.getElementById('score').innerText = `Skóre: ${score}`;
+                finishQuestion(true, correctIndices, explanationText);
             }
+        } else {
+            // 2. NESPRÁVNA ODPOVEĎ (Okamžitá prehra v tejto otázke)
+            element.classList.add('wrong');
+            finishQuestion(false, correctIndices, explanationText);
         }
+    }
 
-        // Zobrazenie vysvetlenia
-        showExplanation(q.explanation);
+    // Funkcia na ukončenie otázky (ukáže zvyšné odpovede a vysvetlenie)
+    function finishQuestion(isWin, correctIndices, explanationText) {
+        questionFinished = true;
+        
+        const options = document.querySelectorAll('.option-item');
+        
+        options.forEach((opt, idx) => {
+            opt.classList.add('disabled'); // Zablokovať všetko
+            
+            // Ak to bola správna odpoveď a ešte nie je označená, označíme ju
+            if (correctIndices.includes(idx) && !opt.classList.contains('correct')) {
+                opt.classList.add('correct');
+                // Pridáme vizuálne odlíšenie, že toto "mal" kliknúť
+                opt.style.opacity = "0.7"; 
+            } else if (!opt.classList.contains('correct') && !opt.classList.contains('wrong')) {
+                // Ostatné nesprávne možnosti stmavíme
+                opt.classList.add('finished');
+            }
+        });
+
+        showExplanation(explanationText);
     }
 
     function showExplanation(text) {
         const div = document.getElementById('explanation');
-        // Vždy ukážeme vysvetlenie, ak existuje, alebo aspoň správne odpovede v texte
-        // (Tu už to vidia farebne, ale vysvetlenie je bonus)
         if (text && text.trim() !== "") {
             div.innerHTML = "<strong>Vysvetlenie:</strong> " + text;
+            div.style.display = 'block';
+        } else {
+            // Ak nie je vysvetlenie, aspoň ukážeme blok, že je koniec
+            div.innerHTML = "<strong>Koniec otázky.</strong>";
             div.style.display = 'block';
         }
     }
