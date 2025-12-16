@@ -31,7 +31,6 @@
         .question-box { margin-bottom: 20px; }
         .question-text { font-size: 1.2em; margin-bottom: 10px; font-weight: bold; }
         
-        /* Nápoveda na pôvodnom mieste */
         .question-hint { color: #e67e22; font-weight: bold; margin-bottom: 15px; font-style: italic; display: block; }
 
         .images-container { text-align: center; margin-bottom: 15px; }
@@ -71,7 +70,6 @@
         button:hover { background: #0056b3; }
         button:disabled { background: #ccc; cursor: not-allowed; }
 
-        /* Farby pre špeciálne tlačidlá */
         .shuffle-q-btn { background-color: #fd7e14; font-size: 14px; padding: 8px 15px; }
         .shuffle-q-btn:hover { background-color: #e36d0d; }
 
@@ -105,7 +103,6 @@
     <div id="quiz-area">
         <div class="question-box">
             <div id="q-text" class="question-text">Načítavam test...</div>
-            
             <div id="q-hint" class="question-hint"></div>
             
             <div class="images-container" id="q-images"></div>
@@ -273,14 +270,15 @@
         showExplanation(explanationText);
     }
 
+    // UPRAVENÁ FUNKCIA - Nezobrazuje nič, ak je text prázdny
     function showExplanation(text) {
         const div = document.getElementById('explanation');
         if (text && text.trim() !== "") {
             div.innerHTML = "<strong>Vysvetlenie:</strong> " + text;
             div.style.display = 'block';
         } else {
-            div.innerHTML = "<strong>Koniec otázky.</strong>";
-            div.style.display = 'block';
+            // Ak nie je vysvetlenie, skryjeme div (žiadne "Koniec otázky")
+            div.style.display = 'none';
         }
     }
 
@@ -294,7 +292,6 @@
         loadQuestion(selectedIndex);
     }
 
-    // Funkcia na miešanie poradia otázok
     function shuffleQuestions() {
         if (!confirm("Naozaj chcete premiešať poradie otázok? Vaše aktuálne skóre sa vynuluje.")) return;
 
@@ -310,26 +307,22 @@
         loadQuestion(0);
     }
 
-    // NOVÉ: Funkcia na miešanie odpovedí GLOBÁLNE (vo všetkých otázkach)
     function shuffleAllAnswers() {
         if (!confirm("Naozaj chcete premiešať poradie odpovedí (A, B, C...) vo všetkých otázkach?")) return;
 
         allQuestions.forEach(q => {
             if (!q.options || q.options.length < 2) return;
 
-            // 1. Spárujeme text a info o správnosti
             let combined = q.options.map((opt, i) => ({
                 text: opt,
                 isCorrect: q.correct_options.includes(i)
             }));
 
-            // 2. Zamiešame (Fisher-Yates)
             for (let i = combined.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [combined[i], combined[j]] = [combined[j], combined[i]];
             }
 
-            // 3. Vrátime späť do štruktúry
             q.options = combined.map(obj => obj.text);
             q.correct_options = [];
             combined.forEach((obj, index) => {
@@ -339,7 +332,6 @@
             });
         });
 
-        // 4. Znova načítame aktuálnu otázku, aby sa zmena prejavila hneď
         loadQuestion(currentIndex);
     }
 </script>
