@@ -15,8 +15,27 @@
         .question-box { margin-bottom: 20px; }
         .question-text { font-size: 1.2em; margin-bottom: 5px; font-weight: bold; }
         
-        /* NOVÉ: Štýl pre nápovedu (Vyberte 2...) */
-        .question-hint { color: #e67e22; font-weight: bold; margin-bottom: 15px; font-style: italic; }
+        .question-hint { color: #e67e22; font-weight: bold; margin-bottom: 10px; font-style: italic; font-size: 0.9em; }
+
+        /* Lišta s nástrojmi pre možnosti (Hint + Shuffle) */
+        .options-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        /* Tlačidlo na miešanie odpovedí (malé, sivé) */
+        .shuffle-answers-btn {
+            background-color: #6c757d;
+            color: white;
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            border: none;
+            cursor: pointer;
+        }
+        .shuffle-answers-btn:hover { background-color: #5a6268; }
 
         .images-container { text-align: center; margin-bottom: 15px; }
         .images-container img { 
@@ -32,16 +51,13 @@
         }
         .option-item:hover { background: #eef; }
         
-        /* Štýly po vyhodnotení */
         .option-item.correct { background-color: #d4edda; border-color: #28a745; color: #155724; font-weight: bold; }
         .option-item.wrong { background-color: #f8d7da; border-color: #dc3545; color: #721c24; opacity: 0.8; }
         
         .option-item.correct::after { content: " ✅"; float: right; }
         .option-item.wrong::after { content: " ❌"; float: right; }
         
-        /* Keď je koniec otázky, zakážeme klikanie na ostatné */
         .option-item.disabled { pointer-events: none; }
-        /* Neoznačené možnosti po skončení trochu stmavíme */
         .option-item.finished { opacity: 0.6; pointer-events: none; }
 
         .explanation { 
@@ -71,22 +87,29 @@
 <body>
 
 <div class="container">
-    <h1>CCNA 2 - Opakovanie</h1>
+    <h1>CCNA 2 - FINAL TEST</h1>
     
     <div class="header-bar">
         <div class="stats">
             <span id="progress">Otázka: 0 / 0</span> | 
             <span id="score">Skóre: 0</span>
         </div>
-        <button class="shuffle-btn" onclick="shuffleQuestions()">🔀 Premiešať otázky</button>
+        <button class="shuffle-btn" onclick="shuffleQuestions()">🔀 Premiešať poradie otázok</button>
     </div>
 
     <div id="quiz-area">
         <div class="question-box">
             <div id="q-text" class="question-text">Načítavam test...</div>
-            <div id="q-hint" class="question-hint"></div>
             
-            <div id="q-images" class="images-container"></div>
+            <div class="images-container" id="q-images"></div>
+
+            <div class="options-toolbar">
+                <div id="q-hint" class="question-hint"></div>
+                <button class="shuffle-answers-btn" onclick="shuffleCurrentOptions()" title="Premiešať odpovede v tejto otázke">
+                    🔀 Premiešať odpovede
+                </button>
+            </div>
+            
             <ul id="q-options" class="options-list"></ul>
         </div>
         
@@ -112,9 +135,8 @@
     let currentIndex = 0;
     let score = 0;
     
-    // Premenné pre logiku "Sudden Death"
-    let correctFoundCount = 0; // Koľko správnych už našiel
-    let questionFinished = false; // Či je otázka uzavretá
+    let correctFoundCount = 0;
+    let questionFinished = false;
 
     // Načítanie dát
     fetch('data.json')
@@ -145,7 +167,6 @@
         if (index < 0 || index >= allQuestions.length) return;
         currentIndex = index;
         
-        // Reset stavu
         questionFinished = false;
         correctFoundCount = 0;
 
@@ -168,9 +189,11 @@
         // Text otázky
         textField.innerText = q.question_text;
 
-        // NOVÉ: Zobrazenie počtu správnych odpovedí
+        // Hint
         const numCorrect = q.correct_options.length;
         if (q.options.length > 0) {
+            // Zobrazíme tlačidlo na miešanie len ak sú možnosti
+            document.querySelector('.shuffle-answers-btn').style.display = 'block';
             if (numCorrect > 1) {
                 hintField.innerText = `(Vyberte ${numCorrect} správne odpovede)`;
             } else {
@@ -178,6 +201,7 @@
             }
         } else {
             hintField.innerText = "";
+            document.querySelector('.shuffle-answers-btn').style.display = 'none';
         }
 
         // Obrázky
@@ -197,7 +221,6 @@
                 const li = document.createElement('li');
                 li.className = 'option-item';
                 li.innerText = opt;
-                // Posielame element aj index na okamžitú kontrolu
                 li.onclick = () => handleOptionClick(li, i, q.correct_options, q.explanation);
                 optionsList.appendChild(li);
             });
@@ -215,48 +238,37 @@
         select.value = currentIndex;
     }
 
-    // NOVÉ: Hlavná logika klikania
     function handleOptionClick(element, index, correctIndices, explanationText) {
         if (questionFinished || element.classList.contains('disabled')) return;
 
         const isCorrect = correctIndices.includes(index);
 
         if (isCorrect) {
-            // 1. SPRÁVNA ODPOVEĎ
             element.classList.add('correct');
-            element.classList.add('disabled'); // Už na ňu neklikneš
+            element.classList.add('disabled');
             correctFoundCount++;
 
-            // Skontrolujeme, či už našiel všetky
             if (correctFoundCount === correctIndices.length) {
-                // VÍŤAZSTVO!
                 score++;
                 document.getElementById('score').innerText = `Skóre: ${score}`;
                 finishQuestion(true, correctIndices, explanationText);
             }
         } else {
-            // 2. NESPRÁVNA ODPOVEĎ (Okamžitá prehra v tejto otázke)
             element.classList.add('wrong');
             finishQuestion(false, correctIndices, explanationText);
         }
     }
 
-    // Funkcia na ukončenie otázky (ukáže zvyšné odpovede a vysvetlenie)
     function finishQuestion(isWin, correctIndices, explanationText) {
         questionFinished = true;
-        
         const options = document.querySelectorAll('.option-item');
         
         options.forEach((opt, idx) => {
-            opt.classList.add('disabled'); // Zablokovať všetko
-            
-            // Ak to bola správna odpoveď a ešte nie je označená, označíme ju
+            opt.classList.add('disabled'); 
             if (correctIndices.includes(idx) && !opt.classList.contains('correct')) {
                 opt.classList.add('correct');
-                // Pridáme vizuálne odlíšenie, že toto "mal" kliknúť
                 opt.style.opacity = "0.7"; 
             } else if (!opt.classList.contains('correct') && !opt.classList.contains('wrong')) {
-                // Ostatné nesprávne možnosti stmavíme
                 opt.classList.add('finished');
             }
         });
@@ -270,7 +282,6 @@
             div.innerHTML = "<strong>Vysvetlenie:</strong> " + text;
             div.style.display = 'block';
         } else {
-            // Ak nie je vysvetlenie, aspoň ukážeme blok, že je koniec
             div.innerHTML = "<strong>Koniec otázky.</strong>";
             div.style.display = 'block';
         }
@@ -299,6 +310,40 @@
         document.getElementById('score').innerText = `Skóre: 0`;
         populateDropdown();
         loadQuestion(0);
+    }
+
+    // NOVÉ: Funkcia na miešanie odpovedí v aktuálnej otázke
+    function shuffleCurrentOptions() {
+        const q = allQuestions[currentIndex];
+        
+        if (!q.options || q.options.length < 2) return;
+
+        // 1. Spárujeme text odpovede s informáciou, či je správna
+        // Musíme použiť q.correct_options na zistenie, či je index správny
+        let combined = q.options.map((opt, i) => ({
+            text: opt,
+            isCorrect: q.correct_options.includes(i)
+        }));
+
+        // 2. Zamiešame (Fisher-Yates)
+        for (let i = combined.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [combined[i], combined[j]] = [combined[j], combined[i]];
+        }
+
+        // 3. Rozbalíme späť do štruktúry otázky
+        q.options = combined.map(obj => obj.text);
+        
+        // Prepočítame nové indexy správnych odpovedí
+        q.correct_options = [];
+        combined.forEach((obj, index) => {
+            if (obj.isCorrect) {
+                q.correct_options.push(index);
+            }
+        });
+
+        // 4. Znova načítame otázku (tým sa zresetuje aj jej stav)
+        loadQuestion(currentIndex);
     }
 </script>
 
