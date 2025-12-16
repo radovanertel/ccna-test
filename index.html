@@ -9,33 +9,30 @@
         .container { max_width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #0056b3; }
         
-        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-        .stats { font-weight: bold; color: #666; }
+        /* Hlavička s tlačidlami */
+        .header-bar { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 20px; 
+            flex-wrap: wrap; 
+            gap: 10px; 
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+        }
+        
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .stats { font-weight: bold; color: #666; font-size: 1.1em; }
         
         .question-box { margin-bottom: 20px; }
-        .question-text { font-size: 1.2em; margin-bottom: 5px; font-weight: bold; }
+        .question-text { font-size: 1.2em; margin-bottom: 10px; font-weight: bold; }
         
-        .question-hint { color: #e67e22; font-weight: bold; margin-bottom: 10px; font-style: italic; font-size: 0.9em; }
-
-        /* Lišta s nástrojmi pre možnosti (Hint + Shuffle) */
-        .options-toolbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        /* Tlačidlo na miešanie odpovedí (malé, sivé) */
-        .shuffle-answers-btn {
-            background-color: #6c757d;
-            color: white;
-            font-size: 12px;
-            padding: 5px 10px;
-            border-radius: 15px;
-            border: none;
-            cursor: pointer;
-        }
-        .shuffle-answers-btn:hover { background-color: #5a6268; }
+        /* Nápoveda na pôvodnom mieste */
+        .question-hint { color: #e67e22; font-weight: bold; margin-bottom: 15px; font-style: italic; display: block; }
 
         .images-container { text-align: center; margin-bottom: 15px; }
         .images-container img { 
@@ -74,8 +71,12 @@
         button:hover { background: #0056b3; }
         button:disabled { background: #ccc; cursor: not-allowed; }
 
-        .shuffle-btn { background-color: #fd7e14; font-size: 14px; padding: 8px 15px; }
-        .shuffle-btn:hover { background-color: #e36d0d; }
+        /* Farby pre špeciálne tlačidlá */
+        .shuffle-q-btn { background-color: #fd7e14; font-size: 14px; padding: 8px 15px; }
+        .shuffle-q-btn:hover { background-color: #e36d0d; }
+
+        .shuffle-a-btn { background-color: #6c757d; font-size: 14px; padding: 8px 15px; }
+        .shuffle-a-btn:hover { background-color: #5a6268; }
 
         .jump-control {
             display: flex; align-items: center; gap: 10px; margin-top: 20px; 
@@ -94,21 +95,20 @@
             <span id="progress">Otázka: 0 / 0</span> | 
             <span id="score">Skóre: 0</span>
         </div>
-        <button class="shuffle-btn" onclick="shuffleQuestions()">🔀 Premiešať poradie otázok</button>
+        
+        <div class="header-buttons">
+            <button class="shuffle-a-btn" onclick="shuffleAllAnswers()" title="Premiešať odpovede (A, B, C...) vo všetkých otázkach">🔀 Premiešať odpovede</button>
+            <button class="shuffle-q-btn" onclick="shuffleQuestions()" title="Zmeniť poradie otázok (1, 2, 3...)">🔀 Premiešať otázky</button>
+        </div>
     </div>
 
     <div id="quiz-area">
         <div class="question-box">
             <div id="q-text" class="question-text">Načítavam test...</div>
             
+            <div id="q-hint" class="question-hint"></div>
+            
             <div class="images-container" id="q-images"></div>
-
-            <div class="options-toolbar">
-                <div id="q-hint" class="question-hint"></div>
-                <button class="shuffle-answers-btn" onclick="shuffleCurrentOptions()" title="Premiešať odpovede v tejto otázke">
-                    🔀 Premiešať odpovede
-                </button>
-            </div>
             
             <ul id="q-options" class="options-list"></ul>
         </div>
@@ -189,11 +189,9 @@
         // Text otázky
         textField.innerText = q.question_text;
 
-        // Hint
+        // Hint (počet odpovedí)
         const numCorrect = q.correct_options.length;
         if (q.options.length > 0) {
-            // Zobrazíme tlačidlo na miešanie len ak sú možnosti
-            document.querySelector('.shuffle-answers-btn').style.display = 'block';
             if (numCorrect > 1) {
                 hintField.innerText = `(Vyberte ${numCorrect} správne odpovede)`;
             } else {
@@ -201,7 +199,6 @@
             }
         } else {
             hintField.innerText = "";
-            document.querySelector('.shuffle-answers-btn').style.display = 'none';
         }
 
         // Obrázky
@@ -297,6 +294,7 @@
         loadQuestion(selectedIndex);
     }
 
+    // Funkcia na miešanie poradia otázok
     function shuffleQuestions() {
         if (!confirm("Naozaj chcete premiešať poradie otázok? Vaše aktuálne skóre sa vynuluje.")) return;
 
@@ -312,37 +310,36 @@
         loadQuestion(0);
     }
 
-    // NOVÉ: Funkcia na miešanie odpovedí v aktuálnej otázke
-    function shuffleCurrentOptions() {
-        const q = allQuestions[currentIndex];
-        
-        if (!q.options || q.options.length < 2) return;
+    // NOVÉ: Funkcia na miešanie odpovedí GLOBÁLNE (vo všetkých otázkach)
+    function shuffleAllAnswers() {
+        if (!confirm("Naozaj chcete premiešať poradie odpovedí (A, B, C...) vo všetkých otázkach?")) return;
 
-        // 1. Spárujeme text odpovede s informáciou, či je správna
-        // Musíme použiť q.correct_options na zistenie, či je index správny
-        let combined = q.options.map((opt, i) => ({
-            text: opt,
-            isCorrect: q.correct_options.includes(i)
-        }));
+        allQuestions.forEach(q => {
+            if (!q.options || q.options.length < 2) return;
 
-        // 2. Zamiešame (Fisher-Yates)
-        for (let i = combined.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [combined[i], combined[j]] = [combined[j], combined[i]];
-        }
+            // 1. Spárujeme text a info o správnosti
+            let combined = q.options.map((opt, i) => ({
+                text: opt,
+                isCorrect: q.correct_options.includes(i)
+            }));
 
-        // 3. Rozbalíme späť do štruktúry otázky
-        q.options = combined.map(obj => obj.text);
-        
-        // Prepočítame nové indexy správnych odpovedí
-        q.correct_options = [];
-        combined.forEach((obj, index) => {
-            if (obj.isCorrect) {
-                q.correct_options.push(index);
+            // 2. Zamiešame (Fisher-Yates)
+            for (let i = combined.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [combined[i], combined[j]] = [combined[j], combined[i]];
             }
+
+            // 3. Vrátime späť do štruktúry
+            q.options = combined.map(obj => obj.text);
+            q.correct_options = [];
+            combined.forEach((obj, index) => {
+                if (obj.isCorrect) {
+                    q.correct_options.push(index);
+                }
+            });
         });
 
-        // 4. Znova načítame otázku (tým sa zresetuje aj jej stav)
+        // 4. Znova načítame aktuálnu otázku, aby sa zmena prejavila hneď
         loadQuestion(currentIndex);
     }
 </script>
