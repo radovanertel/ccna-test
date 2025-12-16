@@ -13,8 +13,22 @@
         .question-box { margin-bottom: 20px; }
         .question-text { font-size: 1.2em; margin-bottom: 15px; font-weight: bold; }
         
+        /* UPRAVENÉ: Obrázky zmenšené o polovicu a vycentrované */
         .images-container { text-align: center; margin-bottom: 15px; }
-        .images-container img { max-width: 100%; height: auto; border: 1px solid #ddd; margin: 5px; border-radius: 4px; }
+        .images-container img { 
+            max-width: 50%;  /* Zmenšenie na polovicu šírky kontajnera */
+            height: auto; 
+            border: 1px solid #ddd; 
+            margin: 10px auto; /* Vycentrovanie */
+            border-radius: 4px; 
+            display: block; /* Aby margin auto fungoval správne */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            cursor: pointer; /* Naznačí, že sa na to dá kliknúť (ak by ste chceli v budúcnosti zoom) */
+        }
+        /* Pre mobilné zariadenia necháme obrázky väčšie, aby boli čitateľné */
+        @media (max-width: 600px) {
+            .images-container img { max-width: 90%; }
+        }
 
         .options-list { list-style: none; padding: 0; }
         .option-item { 
@@ -23,7 +37,6 @@
         }
         .option-item:hover { background: #eef; }
         
-        /* Štýly pre vyhodnotenie */
         .option-item.correct { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
         .option-item.wrong { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
         .option-item.disabled { pointer-events: none; opacity: 0.8; }
@@ -33,13 +46,33 @@
             padding: 15px; margin-top: 15px; border-radius: 4px; color: #856404; 
         }
 
-        .controls { display: flex; justify-content: space-between; margin-top: 20px; }
+        .controls { display: flex; justify-content: space-between; margin-top: 20px; align-items: center; }
+        
         button { 
             padding: 10px 20px; font-size: 16px; cursor: pointer; 
             background: #007bff; color: white; border: none; border-radius: 4px; 
         }
         button:hover { background: #0056b3; }
         button:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* UPRAVENÉ: Štýly pre rozbaľovacie menu */
+        .jump-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            justify-content: center;
+        }
+        .jump-control select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            min-width: 150px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -66,6 +99,14 @@
         <button id="prev-btn" onclick="changeQuestion(-1)" disabled>Popredchádzajúca</button>
         <button id="next-btn" onclick="changeQuestion(1)">Ďalšia</button>
     </div>
+
+    <div class="jump-control">
+        <label for="jump-select">Prejsť na:</label>
+        <select id="jump-select" onchange="jumpToSelected()">
+            <option value="" disabled selected>Načítavam zoznam...</option>
+        </select>
+    </div>
+
 </div>
 
 <script>
@@ -79,12 +120,30 @@
         .then(data => {
             allQuestions = data;
             document.getElementById('progress').innerText = `Otázka: 1 / ${allQuestions.length}`;
+            
+            // Naplnenie rozbaľovacieho zoznamu
+            populateDropdown();
+            
             loadQuestion(0);
         })
         .catch(error => {
             document.getElementById('q-text').innerText = "Chyba: Nepodarilo sa načítať data.json. Skontrolujte, či je súbor v rovnakom priečinku.";
             console.error(error);
         });
+
+    function populateDropdown() {
+        const select = document.getElementById('jump-select');
+        select.innerHTML = ""; // Vyčistiť
+        
+        allQuestions.forEach((q, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            // Zobrazí napr.: "Otázka 1", "Otázka 2" ...
+            // Ak by ste chceli aj text otázky, dajte: `Otázka ${q.id}: ${q.question_text.substring(0, 30)}...`
+            option.text = `Otázka ${index + 1}`; 
+            select.appendChild(option);
+        });
+    }
 
     function loadQuestion(index) {
         if (index < 0 || index >= allQuestions.length) return;
@@ -97,6 +156,7 @@
         const explanationDiv = document.getElementById('explanation');
         const nextBtn = document.getElementById('next-btn');
         const prevBtn = document.getElementById('prev-btn');
+        const select = document.getElementById('jump-select');
 
         // Reset
         explanationDiv.style.display = 'none';
@@ -107,11 +167,14 @@
         // Text otázky
         textField.innerText = q.question_text;
 
-        // Obrázky (ak sú)
+        // Obrázky (zmenšené cez CSS)
         if (q.images && q.images.length > 0) {
             q.images.forEach(src => {
                 const img = document.createElement('img');
                 img.src = src;
+                // Pridanie možnosti otvoriť obrázok v novom tabe po kliknutí (pre istotu)
+                img.onclick = () => window.open(src, '_blank');
+                img.title = "Kliknite pre zväčšenie";
                 imgContainer.appendChild(img);
             });
         }
@@ -126,26 +189,25 @@
                 optionsList.appendChild(li);
             });
         } else {
-            optionsList.innerHTML = "<li><i>Táto otázka nemá textové možnosti (pravdepodobne iba obrázok). Skúste si odpovedať v hlave.</i></li><br>";
-            // Tlačidlo na ukázanie odpovede pre obrázkové otázky
+            optionsList.innerHTML = "<li><i>Táto otázka nemá textové možnosti.</i></li><br>";
             const showBtn = document.createElement('button');
             showBtn.innerText = "Ukáž správnu odpoveď";
             showBtn.onclick = () => showResult([], q.correct_options, q.explanation);
             optionsList.appendChild(showBtn);
         }
 
-        // Navigácia
+        // Navigácia a synchronizácia dropdownu
         document.getElementById('progress').innerText = `Otázka: ${currentIndex + 1} / ${allQuestions.length}`;
         prevBtn.disabled = currentIndex === 0;
         nextBtn.innerText = (currentIndex === allQuestions.length - 1) ? "Koniec" : "Ďalšia";
+        
+        // Aktualizácia vybranej hodnoty v dropdowne (aby sedela s aktuálnou otázkou)
+        select.value = currentIndex;
     }
 
     function checkAnswer(element, selectedIndex, correctIndices, explanationText) {
-        // Zabránenie viacnásobnému klikaniu
         const options = document.querySelectorAll('.option-item');
         if (element.classList.contains('disabled')) return;
-
-        // Označenie všetkých ako disabled
         options.forEach(opt => opt.classList.add('disabled'));
 
         const isCorrect = correctIndices.includes(selectedIndex);
@@ -156,18 +218,14 @@
             document.getElementById('score').innerText = `Skóre: ${score}`;
         } else {
             element.classList.add('wrong');
-            // Zvýrazni správne odpovede
             correctIndices.forEach(idx => {
                 if (options[idx]) options[idx].classList.add('correct');
             });
         }
-
-        // Zobraziť vysvetlenie
         showExplanation(explanationText);
     }
 
     function showResult(dummy, correctIndices, explanationText) {
-         // Pre otázky bez možností
          const explanationDiv = document.getElementById('explanation');
          explanationDiv.innerHTML = "<strong>Správne odpovede:</strong> " + correctIndices.map(i => String.fromCharCode(65+i)).join(', ');
          if (explanationText) explanationDiv.innerHTML += "<br><br><strong>Vysvetlenie:</strong> " + explanationText;
@@ -184,6 +242,13 @@
 
     function changeQuestion(direction) {
         loadQuestion(currentIndex + direction);
+    }
+
+    // Funkcia pre výber z dropdownu
+    function jumpToSelected() {
+        const select = document.getElementById('jump-select');
+        const selectedIndex = parseInt(select.value);
+        loadQuestion(selectedIndex);
     }
 </script>
 
