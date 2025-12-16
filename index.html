@@ -8,24 +8,25 @@
         body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; margin: 0; padding: 20px; }
         .container { max_width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #0056b3; }
-        .stats { display: flex; justify-content: space-between; margin-bottom: 20px; font-weight: bold; color: #666; }
+        
+        /* UPRAVENÉ: Stats a horné tlačidlá */
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .stats { font-weight: bold; color: #666; }
         
         .question-box { margin-bottom: 20px; }
         .question-text { font-size: 1.2em; margin-bottom: 15px; font-weight: bold; }
         
-        /* UPRAVENÉ: Obrázky zmenšené o polovicu a vycentrované */
         .images-container { text-align: center; margin-bottom: 15px; }
         .images-container img { 
-            max-width: 50%;  /* Zmenšenie na polovicu šírky kontajnera */
+            max-width: 50%; 
             height: auto; 
             border: 1px solid #ddd; 
-            margin: 10px auto; /* Vycentrovanie */
+            margin: 10px auto; 
             border-radius: 4px; 
-            display: block; /* Aby margin auto fungoval správne */
+            display: block; 
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            cursor: pointer; /* Naznačí, že sa na to dá kliknúť (ak by ste chceli v budúcnosti zoom) */
+            cursor: pointer; 
         }
-        /* Pre mobilné zariadenia necháme obrázky väčšie, aby boli čitateľné */
         @media (max-width: 600px) {
             .images-container img { max-width: 90%; }
         }
@@ -55,7 +56,14 @@
         button:hover { background: #0056b3; }
         button:disabled { background: #ccc; cursor: not-allowed; }
 
-        /* UPRAVENÉ: Štýly pre rozbaľovacie menu */
+        /* NOVÉ: Tlačidlo pre miešanie */
+        .shuffle-btn {
+            background-color: #fd7e14; /* Oranžová */
+            font-size: 14px;
+            padding: 8px 15px;
+        }
+        .shuffle-btn:hover { background-color: #e36d0d; }
+
         .jump-control {
             display: flex;
             align-items: center;
@@ -80,9 +88,12 @@
 <div class="container">
     <h1>CCNA 2 - Opakovanie</h1>
     
-    <div class="stats">
-        <span id="progress">Otázka: 0 / 0</span>
-        <span id="score">Skóre: 0</span>
+    <div class="header-bar">
+        <div class="stats">
+            <span id="progress">Otázka: 0 / 0</span> | 
+            <span id="score">Skóre: 0</span>
+        </div>
+        <button class="shuffle-btn" onclick="shuffleQuestions()">🔀 Premiešať otázky</button>
     </div>
 
     <div id="quiz-area">
@@ -121,9 +132,7 @@
             allQuestions = data;
             document.getElementById('progress').innerText = `Otázka: 1 / ${allQuestions.length}`;
             
-            // Naplnenie rozbaľovacieho zoznamu
             populateDropdown();
-            
             loadQuestion(0);
         })
         .catch(error => {
@@ -133,14 +142,13 @@
 
     function populateDropdown() {
         const select = document.getElementById('jump-select');
-        select.innerHTML = ""; // Vyčistiť
+        select.innerHTML = ""; 
         
         allQuestions.forEach((q, index) => {
             const option = document.createElement('option');
             option.value = index;
-            // Zobrazí napr.: "Otázka 1", "Otázka 2" ...
-            // Ak by ste chceli aj text otázky, dajte: `Otázka ${q.id}: ${q.question_text.substring(0, 30)}...`
-            option.text = `Otázka ${index + 1}`; 
+            // Zobrazíme poradové číslo v teste (Index+1) a aj pôvodné ID otázky pre orientáciu
+            option.text = `${index + 1}. (Pôvodná otázka ${q.id})`; 
             select.appendChild(option);
         });
     }
@@ -158,7 +166,7 @@
         const prevBtn = document.getElementById('prev-btn');
         const select = document.getElementById('jump-select');
 
-        // Reset
+        // Reset UI
         explanationDiv.style.display = 'none';
         explanationDiv.innerHTML = '';
         imgContainer.innerHTML = '';
@@ -167,12 +175,11 @@
         // Text otázky
         textField.innerText = q.question_text;
 
-        // Obrázky (zmenšené cez CSS)
+        // Obrázky
         if (q.images && q.images.length > 0) {
             q.images.forEach(src => {
                 const img = document.createElement('img');
                 img.src = src;
-                // Pridanie možnosti otvoriť obrázok v novom tabe po kliknutí (pre istotu)
                 img.onclick = () => window.open(src, '_blank');
                 img.title = "Kliknite pre zväčšenie";
                 imgContainer.appendChild(img);
@@ -196,12 +203,11 @@
             optionsList.appendChild(showBtn);
         }
 
-        // Navigácia a synchronizácia dropdownu
+        // Navigácia
         document.getElementById('progress').innerText = `Otázka: ${currentIndex + 1} / ${allQuestions.length}`;
         prevBtn.disabled = currentIndex === 0;
         nextBtn.innerText = (currentIndex === allQuestions.length - 1) ? "Koniec" : "Ďalšia";
         
-        // Aktualizácia vybranej hodnoty v dropdowne (aby sedela s aktuálnou otázkou)
         select.value = currentIndex;
     }
 
@@ -244,11 +250,31 @@
         loadQuestion(currentIndex + direction);
     }
 
-    // Funkcia pre výber z dropdownu
     function jumpToSelected() {
         const select = document.getElementById('jump-select');
         const selectedIndex = parseInt(select.value);
         loadQuestion(selectedIndex);
+    }
+
+    // NOVÉ: Funkcia na náhodné miešanie (Fisher-Yates)
+    function shuffleQuestions() {
+        if (!confirm("Naozaj chcete premiešať poradie otázok? Vaše aktuálne skóre sa vynuluje.")) {
+            return;
+        }
+
+        for (let i = allQuestions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allQuestions[i], allQuestions[j]] = [allQuestions[j], allQuestions[i]];
+        }
+
+        // Reset stavu
+        currentIndex = 0;
+        score = 0;
+        document.getElementById('score').innerText = `Skóre: 0`;
+
+        // Aktualizácia UI
+        populateDropdown(); // Dôležité: Aktualizovať zoznam, aby sedel s novým poradím
+        loadQuestion(0);
     }
 </script>
 
